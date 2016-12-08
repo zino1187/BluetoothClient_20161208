@@ -3,11 +3,14 @@ package com.solu.bluetoothclient_20161208;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.os.Handler;
+import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -20,6 +23,9 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.IOException;
+import java.util.UUID;
+
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemClickListener{
     static final int REQUEST_ENABLE_BLUETOOTH=1;
     static final int REQUEST_ACCESS_PERMISSION=2;
@@ -29,7 +35,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     BroadcastReceiver receiver;
     ListView listView;
     ListAdapter listAdapter;
-
+    String UUID="00001101-0000-1000-8000-00805f9b34fb";
+    BluetoothSocket socket;
+    Thread connectThread;
+    Handler handler;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -50,7 +59,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 if(action.equals(BluetoothDevice.ACTION_FOUND)){
                     BluetoothDevice bluetoothDevice=intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
-                    Toast.makeText(MainActivity.this , bluetoothDevice.getUuids()+"발견했어!!", Toast.LENGTH_SHORT).show();
+                    //Toast.makeText(MainActivity.this , bluetoothDevice.getUuids()+"발견했어!!", Toast.LENGTH_SHORT).show();
 
                     listAdapter.list.add(bluetoothDevice);
                     listAdapter.notifyDataSetChanged(); //갱신
@@ -59,6 +68,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         };
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
         registerReceiver(receiver, filter); //리시버 등록!!
+
+        handler = new Handler(){
+            public void handleMessage(Message message) {
+                String msg=message.getData().getString("msg");
+                Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
+            }
+        };
     }
 
     /*---------------------------------------------------------
@@ -139,6 +155,38 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         Toast.makeText(this, device.getName()+"을 접속할까요?", Toast.LENGTH_SHORT).show();
 
+        try {
+            socket=device.createRfcommSocketToServiceRecord(java.util.UUID.fromString(UUID));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        //쓰레드를 이용하여 접속 시도!!
+        connectThread = new Thread(){
+            public void run() {
+                try {
+                    socket.connect(); //접속 시도!!
+                    Message message = new Message();
+                    Bundle bundle = new Bundle();
+                    bundle.putString("msg","접속 성공");
+                    message.setData(bundle);
+
+                    handler.sendMessage(message);
+
+                } catch (IOException e) {
+                    Message message = new Message();
+                    Bundle bundle = new Bundle();
+                    bundle.putString("msg","접속 실패");
+                    message.setData(bundle);
+
+                    handler.sendMessage(message);
+
+                    e.printStackTrace();
+                }
+            }
+        };
+
+        connectThread.start();
     }
 
 
