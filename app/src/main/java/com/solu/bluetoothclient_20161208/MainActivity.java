@@ -19,6 +19,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -34,16 +35,21 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     //시스템이 앱들에게 인텐트를 방송할때, 그 방송을 받을 수 있는 컴포넌트
     BroadcastReceiver receiver;
     ListView listView;
+    EditText edit_send,edit_receive;
     ListAdapter listAdapter;
     String UUID="00001101-0000-1000-8000-00805f9b34fb";
     BluetoothSocket socket;
     Thread connectThread;
     Handler handler;
+    DataThread dataThread;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        edit_send=(EditText)findViewById(R.id.edit_send);
+        edit_receive=(EditText)findViewById(R.id.edit_receive);
         listView=(ListView)findViewById(R.id.listView);
+
         listAdapter = new ListAdapter(this);
         listView.setAdapter(listAdapter);//리스트뷰와 어댑터 연결
         listView.setOnItemClickListener(this);
@@ -72,7 +78,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         handler = new Handler(){
             public void handleMessage(Message message) {
                 String msg=message.getData().getString("msg");
-                Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
+                edit_receive.setText(msg);
             }
         };
     }
@@ -173,6 +179,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                     handler.sendMessage(message);
 
+                    //소켓으로부터 스트림 뽑아서 데이터 주고 받자...
+                    dataThread = new DataThread(MainActivity.this, socket);
+                    dataThread.start();
+
                 } catch (IOException e) {
                     Message message = new Message();
                     Bundle bundle = new Bundle();
@@ -190,13 +200,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
 
-   /*---------------------------------------------------------
-    접속된 이후, 스트림 뽑아서 대화 나누면...
-     C - java  : 걱정하지 말라..소켓에 의한 스트림만 제어하면 됨..
-    ---------------------------------------------------------*/
-
-
-
      /*---------------------------------------------------------
     메세지 창 띄우기
     ---------------------------------------------------------*/
@@ -206,8 +209,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
 
+    public void sendMsg(){
+        String msg=edit_send.getText().toString();
+        dataThread.send(msg);
+    }
+
     public void btnClick(View view){
-        checkAccessPermission();
+        switch (view.getId()) {
+            case R.id.bt_scan:checkAccessPermission();break;
+            case R.id.bt_send:sendMsg();break;
+        }
     }
 
     public void onItemClick(AdapterView<?> adapterView, View view, int index, long id) {
